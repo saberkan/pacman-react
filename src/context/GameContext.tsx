@@ -1,4 +1,10 @@
-import { createContext, useContext, ReactNode, useState } from "react";
+import {
+  createContext,
+  useContext,
+  ReactNode,
+  useState,
+  useCallback,
+} from "react";
 import { Position, pacmanStartPosition } from "../types/position";
 import { GAME_STATUS, GameStatus } from "../types/gameStatus";
 
@@ -49,29 +55,30 @@ export function GameProvider({ children }: Props) {
     contextDefaultValues.gameStatus
   );
 
-  const setFoodAmount = (foodAmount: number) => {
+  const setFoodAmount = useCallback((foodAmount: number) => {
     _setFoodAmount(foodAmount);
-  };
+  }, []);
 
-  const setGameStatus = (gameStatus: GameStatus) => {
+  const setGameStatus = useCallback((gameStatus: GameStatus) => {
     _setGameStatus(gameStatus);
-  };
+  }, []);
 
-  const setPacmanPosition = (pacmanPosition: Position) => {
+  const setPacmanPosition = useCallback((pacmanPosition: Position) => {
     _setPacmanPosition(pacmanPosition);
-  };
-  const setPoints = (points: number) => {
-    _setPoints(points);
-  };
+  }, []);
 
-  const restartGame = () => {
+  const setPoints = useCallback((points: number) => {
+    _setPoints(points);
+  }, []);
+
+  const restartGame = useCallback(() => {
     _setPoints(0);
     _setGameStatus(GAME_STATUS.IN_PROGRESS);
     _setPacmanPosition(pacmanStartPosition);
 
     const event = new Event("restart-game");
     document.dispatchEvent(event);
-  };
+  }, []);
 
   const value = {
     foodAmount,

@@ -25,6 +25,11 @@ const Pacman = (props: Character) => {
     setPacmanPosition,
     gameStatus,
   } = useGameContext();
+  const gameStatusRef = React.useRef(gameStatus);
+  React.useEffect(() => {
+    gameStatusRef.current = gameStatus;
+  }, [gameStatus]);
+
   const [direction, setDirection] = React.useState<Direction>(DIRECTION.RIGHT);
   const [color, setColor] = React.useState<string>(props.color);
   useInterval(move, 100);
@@ -68,7 +73,8 @@ const Pacman = (props: Character) => {
   }
 
   function move() {
-    if (gameStatus === GAME_STATUS.IN_PROGRESS) {
+    const status = gameStatusRef.current;
+    if (status === GAME_STATUS.IN_PROGRESS) {
       const currentLeft = position.left;
       const currentTop = position.top;
       let newPosition: Position = { top: 0, left: 0 };
@@ -109,7 +115,7 @@ const Pacman = (props: Character) => {
       }
       setPacmanPosition(newPosition);
     }
-    if (gameStatus === GAME_STATUS.LOST) {
+    if (status === GAME_STATUS.LOST) {
       setColor(COLOR.PACMAN_DEAD);
     }
   }
