@@ -7,7 +7,6 @@ import colors from "../styles/Colors";
 import { useGameContext } from "../context/GameContext";
 import { GAME_STATUS } from "../types/gameStatus";
 import { COLOR } from "../types/color";
-import { DIFFICULTY, Difficulty } from "../types/difficulty";
 
 type SceneProps = {
   foodSize: number;
@@ -51,30 +50,16 @@ const generateFoodMatrix = (props: SceneProps, amountOfFood: number) => {
   return foods;
 };
 
+const easyGhostVelocity = 15;
+
 const Scene = (props: SceneProps) => {
   const {
     setFoodAmount,
     restartGame,
-    setDifficulty,
-    setGameStatus,
     foodAmount,
     gameStatus,
-    difficulty,
+    setGameStatus,
   } = useGameContext();
-
-  const [ghostVelocity, setGhostVelocity] = React.useState(20);
-
-  React.useEffect(() => {
-    if (difficulty === DIFFICULTY.EASY) {
-      setGhostVelocity(15);
-    }
-    if (difficulty === DIFFICULTY.MEDIUM) {
-      setGhostVelocity(20);
-    }
-    if (difficulty === DIFFICULTY.ADVANCED) {
-      setGhostVelocity(30);
-    }
-  }, [difficulty]);
 
   React.useEffect(() => {
     const amountOfFood =
@@ -89,53 +74,36 @@ const Scene = (props: SceneProps) => {
 
   return (
     <StyledScene>
-      {gameStatus !== GAME_STATUS.IN_PROGRESS &&
-        gameStatus !== GAME_STATUS.PAUSED && (
-          <OverlayContent>
-            {gameStatus === GAME_STATUS.WON ? (
-              <CenterContainer>
-                <div>
-                  <strong>Congratulations :)</strong>
-                </div>
-                <StyledButton onClick={() => restartGame()}>
-                  Play again
-                </StyledButton>
-              </CenterContainer>
-            ) : (
-              <CenterContainer>
-                <div>
-                  <strong>GAME OVER :(</strong>
-                </div>
-                <StyledButton onClick={() => restartGame()}>
-                  Try Again
-                </StyledButton>
-              </CenterContainer>
-            )}
-          </OverlayContent>
-        )}
-      {gameStatus === GAME_STATUS.PAUSED && (
+      {gameStatus !== GAME_STATUS.IN_PROGRESS && (
         <OverlayContent>
-          <CenterContainer>
-            <div>
-              <span>Set Difficulty</span>
-            </div>
-            <div>
-              <select
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+          {gameStatus === GAME_STATUS.READY ? (
+            <CenterContainer>
+              <StyledButton
+                type="button"
+                onClick={() => setGameStatus(GAME_STATUS.IN_PROGRESS)}
               >
-                <option value={DIFFICULTY.EASY}>Easy</option>
-                <option value={DIFFICULTY.MEDIUM}>Medium</option>
-                <option value={DIFFICULTY.ADVANCED}>Advanced</option>
-              </select>
-            </div>
-
-            <StyledButton
-              onClick={() => setGameStatus(GAME_STATUS.IN_PROGRESS)}
-            >
-              Play!
-            </StyledButton>
-          </CenterContainer>
+                Start
+              </StyledButton>
+            </CenterContainer>
+          ) : gameStatus === GAME_STATUS.WON ? (
+            <CenterContainer>
+              <div>
+                <strong>Congratulations :)</strong>
+              </div>
+              <StyledButton type="button" onClick={() => restartGame()}>
+                Play again
+              </StyledButton>
+            </CenterContainer>
+          ) : (
+            <CenterContainer>
+              <div>
+                <strong>GAME OVER :(</strong>
+              </div>
+              <StyledButton type="button" onClick={() => restartGame()}>
+                Try Again
+              </StyledButton>
+            </CenterContainer>
+          )}
         </OverlayContent>
       )}
       {generateFoodMatrix(props, foodAmount)}
@@ -148,7 +116,7 @@ const Scene = (props: SceneProps) => {
         color={colors.color2}
       ></Pacman>
       <Ghost
-        velocity={ghostVelocity}
+        velocity={easyGhostVelocity}
         size={ghostSize}
         border={20}
         topScoreBoard={topScoreBoardHeight}
@@ -156,33 +124,13 @@ const Scene = (props: SceneProps) => {
         name="ghost1"
       ></Ghost>
       <Ghost
-        velocity={ghostVelocity}
+        velocity={easyGhostVelocity}
         size={ghostSize}
         border={20}
         topScoreBoard={topScoreBoardHeight}
         color={COLOR.GREEN}
         name="ghost2"
       ></Ghost>
-      {difficulty !== DIFFICULTY.EASY && (
-        <Ghost
-          velocity={ghostVelocity}
-          size={ghostSize}
-          border={20}
-          topScoreBoard={topScoreBoardHeight}
-          color={COLOR.BLUE}
-          name="ghost3"
-        ></Ghost>
-      )}
-      {difficulty === DIFFICULTY.ADVANCED && (
-        <Ghost
-          velocity={ghostVelocity}
-          size={ghostSize}
-          border={20}
-          topScoreBoard={topScoreBoardHeight}
-          color={COLOR.ORANGE}
-          name="ghost4"
-        ></Ghost>
-      )}
     </StyledScene>
   );
 };

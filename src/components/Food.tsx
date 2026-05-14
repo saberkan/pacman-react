@@ -22,8 +22,14 @@ export type FoodProps = {
 const Food = (props: FoodProps) => {
   const position = props.position;
   const [isHidden, setIsHidden] = React.useState(false);
-  const { pacmanPosition, setPoints, points, foodAmount, setGameStatus } =
-    useGameContext();
+  const {
+    pacmanPosition,
+    setPoints,
+    points,
+    foodAmount,
+    setGameStatus,
+    gameStatus,
+  } = useGameContext();
 
   function eaten() {
     setIsHidden(true);
@@ -40,6 +46,7 @@ const Food = (props: FoodProps) => {
 
   React.useEffect(() => {
     if (
+      gameStatus === GAME_STATUS.IN_PROGRESS &&
       !isHidden &&
       pacmanPosition.left + (props.pacmanSize - eatPrecision) / 2 >=
         position.left &&
@@ -55,7 +62,7 @@ const Food = (props: FoodProps) => {
       }
       setPoints(points + 1);
     }
-  }, [pacmanPosition, position]);
+  }, [pacmanPosition, position, gameStatus, isHidden]);
 
   return (
     <StyledFood position={props.position} hidden={isHidden}>

@@ -128,7 +128,7 @@ const Ghost = (props: Character) => {
       });
     }
     if (
-      gameStatus !== GAME_STATUS.PAUSED &&
+      gameStatus !== GAME_STATUS.READY &&
       gameStatus !== GAME_STATUS.IN_PROGRESS
     ) {
       setColor(COLOR.GHOST_DEAD);
