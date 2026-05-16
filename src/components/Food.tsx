@@ -8,6 +8,8 @@ import { GAME_STATUS } from "../types/gameStatus";
 interface StyledFoodProps {
   position: Position;
   hidden: boolean;
+  $cellWidth: number;
+  $cellHeight: number;
 }
 
 const eatPrecision = 18;
@@ -17,9 +19,14 @@ export type FoodProps = {
   position: Position;
   hidden: boolean;
   pacmanSize: number;
+  /** Matches playfield grid pitch (default 60). */
+  cellWidth?: number;
+  cellHeight?: number;
 };
 
 const Food = (props: FoodProps) => {
+  const cellWidth = props.cellWidth ?? 60;
+  const cellHeight = props.cellHeight ?? 60;
   const position = props.position;
   const [isHidden, setIsHidden] = React.useState(false);
   const {
@@ -65,17 +72,24 @@ const Food = (props: FoodProps) => {
   }, [pacmanPosition, position, gameStatus, isHidden]);
 
   return (
-    <StyledFood position={props.position} hidden={isHidden}>
+    <StyledFood
+      position={props.position}
+      hidden={isHidden}
+      $cellWidth={cellWidth}
+      $cellHeight={cellHeight}
+    >
       <div className="effective-food"></div>
     </StyledFood>
   );
 };
 
 const StyledFood = styled.div<StyledFoodProps>`
-  width: 60px;
-  height: 60px;
+  width: ${(props) => props.$cellWidth}px;
+  height: ${(props) => props.$cellHeight}px;
   position: absolute;
-  display: ${(props) => (props.hidden ? "none" : "block")};
+  display: ${(props) => (props.hidden ? "none" : "flex")};
+  align-items: center;
+  justify-content: center;
   top: ${(props) => props.position.top}px;
   left: ${(props) => props.position.left}px;
 
@@ -84,7 +98,7 @@ const StyledFood = styled.div<StyledFoodProps>`
     width: 10px;
     height: 10px;
     background-color: ${colors.color2};
-    margin: 20px;
+    flex-shrink: 0;
   }
 `;
 

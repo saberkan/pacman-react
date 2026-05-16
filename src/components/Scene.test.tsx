@@ -34,6 +34,89 @@ function StatusTriggers() {
 
 const sceneProps = { foodSize: 60, border: 20, topScoreBoard: 100 };
 
+function FoodAmountProbe() {
+  const { foodAmount } = useGameContext();
+  return <span data-testid="food-amount">{foodAmount}</span>;
+}
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+test("after layout, food dot count matches cols × rows from scene client size", () => {
+  const sceneWidth = 480;
+  const sceneHeight = 360;
+  jest
+    .spyOn(HTMLElement.prototype, "clientWidth", "get")
+    .mockReturnValue(sceneWidth);
+  jest
+    .spyOn(HTMLElement.prototype, "clientHeight", "get")
+    .mockReturnValue(sceneHeight);
+
+  render(
+    <GameProvider>
+      <Scene {...sceneProps} />
+    </GameProvider>
+  );
+
+  const cols = Math.floor(sceneWidth / sceneProps.foodSize);
+  const rows = Math.floor(sceneHeight / sceneProps.foodSize);
+
+  expect(document.querySelectorAll(".effective-food")).toHaveLength(
+    cols * rows
+  );
+});
+
+test("with remainder pixels, food count matches floor-based grid (tiling math in unit tests)", () => {
+  const sceneWidth = 500;
+  const sceneHeight = 370;
+  jest
+    .spyOn(HTMLElement.prototype, "clientWidth", "get")
+    .mockReturnValue(sceneWidth);
+  jest
+    .spyOn(HTMLElement.prototype, "clientHeight", "get")
+    .mockReturnValue(sceneHeight);
+
+  const { container } = render(
+    <GameProvider>
+      <Scene {...sceneProps} />
+    </GameProvider>
+  );
+
+  const cols = Math.floor(sceneWidth / sceneProps.foodSize);
+  const rows = Math.floor(sceneHeight / sceneProps.foodSize);
+
+  expect(container.querySelectorAll(".effective-food")).toHaveLength(
+    cols * rows
+  );
+});
+
+test("sets foodAmount in context to cols × rows when scene size is known", () => {
+  const sceneWidth = 300;
+  const sceneHeight = 240;
+  jest
+    .spyOn(HTMLElement.prototype, "clientWidth", "get")
+    .mockReturnValue(sceneWidth);
+  jest
+    .spyOn(HTMLElement.prototype, "clientHeight", "get")
+    .mockReturnValue(sceneHeight);
+
+  render(
+    <GameProvider>
+      <FoodAmountProbe />
+      <Scene {...sceneProps} />
+    </GameProvider>
+  );
+
+  const expected =
+    Math.floor(sceneWidth / sceneProps.foodSize) *
+    Math.floor(sceneHeight / sceneProps.foodSize);
+
+  expect(screen.getByTestId("food-amount")).toHaveTextContent(
+    String(expected)
+  );
+});
+
 test("shows game over overlay with try again", async () => {
   render(
     <GameProvider>

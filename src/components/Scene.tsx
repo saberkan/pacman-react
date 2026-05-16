@@ -7,6 +7,7 @@ import colors from "../styles/Colors";
 import { useGameContext } from "../context/GameContext";
 import { GAME_STATUS } from "../types/gameStatus";
 import { COLOR } from "../types/color";
+import { computePlayfieldFoodGrid } from "../utils/computePlayfieldFoodGrid";
 
 type SceneProps = {
   foodSize: number;
@@ -19,33 +20,37 @@ const pacmanVelocity = 30;
 const ghostSize = 60;
 const topScoreBoardHeight = 100;
 
-const generateFoodMatrix = (props: SceneProps, amountOfFood: number) => {
-  let currentTop = 0;
-  let currentLeft = 0;
-  const foods = [];
+/** When layout metrics are unavailable (e.g. tests), approximate inner size from the window. */
+const windowFallbackInnerSize = (p: SceneProps) => ({
+  width: Math.max(0, window.innerWidth - p.border),
+  height: Math.max(0, window.innerHeight - p.border - p.topScoreBoard),
+});
 
-  for (let i = 0; i <= amountOfFood; i++) {
-    if (currentLeft + props.foodSize >= window.innerWidth - props.border) {
-      currentTop += props.foodSize;
-      currentLeft = 0;
+const generateFoodMatrix = (
+  props: SceneProps,
+  cols: number,
+  rows: number,
+  cellWidth: number,
+  cellHeight: number
+) => {
+  const foods = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      foods.push(
+        <Food
+          pacmanSize={pacmanSize}
+          hidden={false}
+          name={`food-${row}-${col}`}
+          cellWidth={cellWidth}
+          cellHeight={cellHeight}
+          position={{
+            left: col * cellWidth,
+            top: row * cellHeight,
+          }}
+          key={`${row}-${col}`}
+        />
+      );
     }
-    if (
-      currentTop + props.foodSize >=
-      window.innerHeight - props.border - props.topScoreBoard
-    ) {
-      break;
-    }
-    const position = { left: currentLeft, top: currentTop };
-    currentLeft = currentLeft + props.foodSize;
-    foods.push(
-      <Food
-        pacmanSize={pacmanSize}
-        hidden={false}
-        name={"food" + i}
-        position={position}
-        key={i}
-      />
-    );
   }
   return foods;
 };
@@ -55,11 +60,20 @@ const easyGhostVelocity = 15;
 const Scene = (props: SceneProps) => {
   const {
     setFoodAmount,
+    setPlayfieldInnerSize,
+    setPlayfieldGrid,
     restartGame,
-    foodAmount,
     gameStatus,
     setGameStatus,
   } = useGameContext();
+
+  const sceneRef = React.useRef<HTMLDivElement>(null);
+  const [foodGrid, setFoodGrid] = React.useState<{
+    cols: number;
+    rows: number;
+    cellWidth: number;
+    cellHeight: number;
+  } | null>(null);
 
   const gameStatusRef = React.useRef(gameStatus);
   React.useEffect(() => {
@@ -104,19 +118,77 @@ const Scene = (props: SceneProps) => {
     };
   }, [gameStatus, setGameStatus]);
 
-  React.useEffect(() => {
-    const amountOfFood =
-      Math.floor((window.innerWidth - props.border) / props.foodSize) *
-      Math.floor(
-        (window.innerHeight - props.border - props.topScoreBoard) /
-          props.foodSize
-      );
+  React.useLayoutEffect(() => {
+    const node = sceneRef.current;
+    if (!node) {
+      return;
+    }
 
-    setFoodAmount(amountOfFood);
-  }, []);
+    const syncGridFromScene = () => {
+      const el = sceneRef.current;
+      if (!el) {
+        return;
+      }
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      let cols: number;
+      let rows: number;
+      let innerWidthPx: number;
+      let innerHeightPx: number;
+
+      if (w > 0 && h > 0) {
+        innerWidthPx = w;
+        innerHeightPx = h;
+      } else {
+        const fb = windowFallbackInnerSize(props);
+        innerWidthPx = fb.width;
+        innerHeightPx = fb.height;
+      }
+
+      const computed = computePlayfieldFoodGrid(
+        innerWidthPx,
+        innerHeightPx,
+        props.foodSize
+      );
+      cols = computed.cols;
+      rows = computed.rows;
+
+      setFoodGrid({
+        cols,
+        rows,
+        cellWidth: computed.cellWidth,
+        cellHeight: computed.cellHeight,
+      });
+      setFoodAmount(cols * rows);
+      setPlayfieldInnerSize({ width: innerWidthPx, height: innerHeightPx });
+      setPlayfieldGrid({
+        cols,
+        rows,
+        cellWidth: computed.cellWidth,
+        cellHeight: computed.cellHeight,
+      });
+    };
+
+    syncGridFromScene();
+
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(syncGridFromScene)
+        : null;
+    observer?.observe(node);
+
+    return () => observer?.disconnect();
+  }, [
+    props.foodSize,
+    props.border,
+    props.topScoreBoard,
+    setFoodAmount,
+    setPlayfieldInnerSize,
+    setPlayfieldGrid,
+  ]);
 
   return (
-    <StyledScene>
+    <StyledScene ref={sceneRef}>
       {gameStatus === GAME_STATUS.PAUSED && (
         <PauseOverlay aria-hidden>
           <PauseMessage>Paused — click anywhere to resume</PauseMessage>
@@ -155,7 +227,15 @@ const Scene = (props: SceneProps) => {
             )}
           </OverlayContent>
         )}
-      {generateFoodMatrix(props, foodAmount)}
+      {foodGrid
+        ? generateFoodMatrix(
+            props,
+            foodGrid.cols,
+            foodGrid.rows,
+            foodGrid.cellWidth,
+            foodGrid.cellHeight
+          )
+        : null}
       <Pacman
         velocity={pacmanVelocity}
         size={pacmanSize}
@@ -229,11 +309,17 @@ const OverlayContent = styled.div`
 
 const StyledScene = styled.div`
   --container-width: 100vw - 20px;
+  --wall-thickness: 14px;
   height: calc(100vh - 120px);
   width: calc(var(--container-width));
   background-color: ${colors.color1};
   position: relative;
-  border: 10px ${colors.color3} solid;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: var(--wall-thickness) #fff solid;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    inset 0 0 10px rgba(0, 0, 0, 0.2);
 `;
 
 const StyledButton = styled.button`

@@ -7,6 +7,12 @@ import { useGameContext } from "../context/GameContext";
 import { useInterval } from "../hooks/useInterval";
 import { COLOR } from "../types/color";
 import { GAME_STATUS } from "../types/gameStatus";
+import {
+  snapPositionToFoodGrid,
+  stepOnFoodGrid,
+} from "../utils/playfieldGridMovement";
+import { clampCharacterToPlayfield } from "../utils/clampCharacterToPlayfield";
+import { MOVEMENT_TICK_MS } from "../constants/gameplayPacing";
 
 interface StyledGhostProps {
   position: Position;
@@ -39,18 +45,39 @@ const GhostIcon = () => (
 );
 
 const Ghost = (props: Character) => {
-  const { pacmanPosition, setGameStatus, gameStatus } = useGameContext();
+  const {
+    pacmanPosition,
+    setGameStatus,
+    gameStatus,
+    playfieldGrid,
+    playfieldInnerSize,
+  } = useGameContext();
   const gameStatusRef = React.useRef(gameStatus);
   React.useEffect(() => {
     gameStatusRef.current = gameStatus;
   }, [gameStatus]);
 
+  const pacmanPositionRef = React.useRef(pacmanPosition);
+  pacmanPositionRef.current = pacmanPosition;
+
+  const playfieldInnerSizeRef = React.useRef(playfieldInnerSize);
+  React.useEffect(() => {
+    playfieldInnerSizeRef.current = playfieldInnerSize;
+  }, [playfieldInnerSize]);
+
+  const playfieldGridRef = React.useRef(playfieldGrid);
+  React.useEffect(() => {
+    playfieldGridRef.current = playfieldGrid;
+  }, [playfieldGrid]);
+
   const [position, setPosition] = React.useState<Position>(ghostStartPosition);
   const [direction, setDirection] = React.useState<Direction>(DIRECTION.LEFT);
+  const directionRef = React.useRef(direction);
+  directionRef.current = direction;
   const [color, setColor] = React.useState<string>(props.color!);
   const [changeDirectionWaitingTime, setChangeDirectionWaitingTime] =
     React.useState(0);
-  useInterval(move, 100);
+  useInterval(move, MOVEMENT_TICK_MS);
 
   React.useEffect(() => {
     document.addEventListener("restart-game", gameRestarted);
@@ -59,8 +86,36 @@ const Ghost = (props: Character) => {
 
   function gameRestarted() {
     setColor(props.color);
-    setPosition(ghostStartPosition);
+    const g = playfieldGridRef.current;
+    if (g && g.cols > 0 && g.rows > 0) {
+      setPosition(snapPositionToFoodGrid(ghostStartPosition, g));
+    } else {
+      setPosition(
+        clampCharacterToPlayfield(
+          ghostStartPosition,
+          props.size,
+          playfieldInnerSizeRef.current,
+          {
+            innerWidth: window.innerWidth,
+            innerHeight: window.innerHeight,
+            border: props.border,
+            topScoreBoard: props.topScoreBoard,
+          }
+        )
+      );
+    }
   }
+
+  React.useLayoutEffect(() => {
+    if (
+      !playfieldGrid ||
+      playfieldGrid.cols <= 0 ||
+      playfieldGrid.rows <= 0
+    ) {
+      return;
+    }
+    setPosition((p) => snapPositionToFoodGrid(p, playfieldGrid));
+  }, [playfieldGrid]);
 
   function move() {
     const status = gameStatusRef.current;
@@ -82,50 +137,20 @@ const Ghost = (props: Character) => {
       }
 
       setPosition((oldPosition: Position) => {
-        const currentLeft = position.left;
-        const currentTop = position.top;
-        let newPosition: Position = { top: 0, left: 0 };
-
-        switch (direction) {
-          case DIRECTION.LEFT:
-            newPosition = {
-              top: currentTop,
-              left: Math.max(currentLeft - props.velocity, 0),
-            };
-            break;
-          case DIRECTION.UP:
-            newPosition = {
-              top: Math.max(currentTop - props.velocity, 0),
-              left: currentLeft,
-            };
-            break;
-          case DIRECTION.RIGHT:
-            newPosition = {
-              top: currentTop,
-              left: Math.min(
-                currentLeft + props.velocity,
-                window.innerWidth - props.border - props.size
-              ),
-            };
-            break;
-
-          default:
-            newPosition = {
-              top: Math.min(
-                currentTop + props.velocity,
-                window.innerHeight -
-                  props.size -
-                  props.border -
-                  props.topScoreBoard
-              ),
-              left: currentLeft,
-            };
+        const g = playfieldGridRef.current;
+        if (!g || g.cols <= 0 || g.rows <= 0) {
+          return oldPosition;
         }
+
+        const stepped = stepOnFoodGrid(oldPosition, directionRef.current, g);
+        const newPosition = stepped ?? oldPosition;
+
+        const pp = pacmanPositionRef.current;
         if (
-          pacmanPosition.left > newPosition.left - props.size &&
-          pacmanPosition.left < newPosition.left + props.size &&
-          pacmanPosition.top > newPosition.top - props.size &&
-          pacmanPosition.top < newPosition.top + props.size
+          pp.left > newPosition.left - props.size &&
+          pp.left < newPosition.left + props.size &&
+          pp.top > newPosition.top - props.size &&
+          pp.top < newPosition.top + props.size
         ) {
           setGameStatus(GAME_STATUS.LOST);
         }
