@@ -111,3 +111,69 @@ test("eating normal pellet does not activate power mode", async () => {
   await userEvent.click(screen.getByRole("button", { name: /^eat$/i }));
   expect(screen.getByTestId("power-mode")).toHaveTextContent("off");
 });
+
+function SeedLastPellet() {
+  const { setFoodAmount, setPoints, setGameStatus } = useGameContext();
+  React.useLayoutEffect(() => {
+    setFoodAmount(1);
+    setPoints(0);
+    setGameStatus(GAME_STATUS.IN_PROGRESS);
+  }, [setFoodAmount, setGameStatus, setPoints]);
+  return null;
+}
+
+function PointsProbe() {
+  const { points } = useGameContext();
+  return <span data-testid="points">{points}</span>;
+}
+
+function StatusProbe() {
+  const { gameStatus } = useGameContext();
+  return <span data-testid="game-status">{gameStatus}</span>;
+}
+
+test("eating a pellet increments points", async () => {
+  render(
+    <GameProvider>
+      <BootInProgress />
+      <PointsProbe />
+      <Food
+        name="t"
+        position={{ left: 200, top: 200 }}
+        hidden={false}
+        pacmanSize={60}
+        variant="normal"
+      />
+      <MoveOntoPellet />
+    </GameProvider>,
+  );
+
+  expect(screen.getByTestId("points")).toHaveTextContent("0");
+  await userEvent.click(screen.getByRole("button", { name: /^eat$/i }));
+  expect(screen.getByTestId("points")).toHaveTextContent("1");
+});
+
+test("eating the last pellet sets game to WON", async () => {
+  render(
+    <GameProvider>
+      <SeedLastPellet />
+      <StatusProbe />
+      <PointsProbe />
+      <Food
+        name="t"
+        position={{ left: 200, top: 200 }}
+        hidden={false}
+        pacmanSize={60}
+        variant="normal"
+      />
+      <MoveOntoPellet />
+    </GameProvider>,
+  );
+
+  expect(screen.getByTestId("game-status")).toHaveTextContent(
+    GAME_STATUS.IN_PROGRESS,
+  );
+  await userEvent.click(screen.getByRole("button", { name: /^eat$/i }));
+  expect(screen.getByTestId("points")).toHaveTextContent("1");
+  expect(screen.getByTestId("game-status")).toHaveTextContent(GAME_STATUS.WON);
+});

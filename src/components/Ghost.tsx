@@ -85,6 +85,9 @@ const Ghost = (props: Character) => {
   directionRef.current = direction;
   const [color, setColor] = React.useState<string>(props.color!);
   const [isEaten, setIsEaten] = React.useState(false);
+  /** Bumped on restart so `registerPowerEatGhost` re-runs after `restartGame` clears the registry. */
+  const [powerEatRegistrationEpoch, setPowerEatRegistrationEpoch] =
+    React.useState(0);
   const isEatenRef = React.useRef(isEaten);
   React.useEffect(() => {
     isEatenRef.current = isEaten;
@@ -132,7 +135,13 @@ const Ghost = (props: Character) => {
         queueMicrotask(() => setIsEaten(true));
       },
     });
-  }, [isEaten, props.name, props.size, registerPowerEatGhost]);
+  }, [
+    isEaten,
+    props.name,
+    props.size,
+    registerPowerEatGhost,
+    powerEatRegistrationEpoch,
+  ]);
 
   React.useEffect(() => {
     document.addEventListener("restart-game", gameRestarted);
@@ -141,6 +150,7 @@ const Ghost = (props: Character) => {
 
   function gameRestarted() {
     setIsEaten(false);
+    setPowerEatRegistrationEpoch((e) => e + 1);
     setColor(props.color);
     const g = playfieldGridRef.current;
     if (g && g.cols > 0 && g.rows > 0) {

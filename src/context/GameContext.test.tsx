@@ -122,3 +122,120 @@ test("startOrRefreshPowerMode extends the window when triggered again", async ()
 
   jest.useRealTimers();
 });
+
+function PowerEatHarness() {
+  const {
+    tryPowerEatFromPacmanMove,
+    registerPowerEatGhost,
+    startOrRefreshPowerMode,
+  } = useGameContext();
+  const [eatenCount, setEatenCount] = React.useState(0);
+
+  React.useLayoutEffect(() => {
+    return registerPowerEatGhost("g1", {
+      getPosition: () => ({ left: 0, top: 0 }),
+      size: 60,
+      onEaten: () => setEatenCount((c) => c + 1),
+    });
+  }, [registerPowerEatGhost]);
+
+  return (
+    <div>
+      <span data-testid="eaten-count">{eatenCount}</span>
+      <button
+        type="button"
+        aria-label="Harness start power mode"
+        onClick={startOrRefreshPowerMode}
+      >
+        start power
+      </button>
+      <button
+        type="button"
+        aria-label="Harness try overlap eat"
+        onClick={() => tryPowerEatFromPacmanMove({ left: 0, top: 0 }, 60)}
+      >
+        try overlap
+      </button>
+      <button
+        type="button"
+        aria-label="Harness try no overlap eat"
+        onClick={() => tryPowerEatFromPacmanMove({ left: 400, top: 400 }, 60)}
+      >
+        try no overlap
+      </button>
+    </div>
+  );
+}
+
+test("tryPowerEatFromPacmanMove does nothing without power mode", async () => {
+  render(
+    <GameProvider>
+      <PowerEatHarness />
+    </GameProvider>,
+  );
+
+  await userEvent.click(
+    screen.getByRole("button", { name: /harness try overlap eat/i }),
+  );
+  expect(screen.getByTestId("eaten-count")).toHaveTextContent("0");
+});
+
+test("tryPowerEatFromPacmanMove calls onEaten when overlapping in power mode", async () => {
+  render(
+    <GameProvider>
+      <PowerEatHarness />
+    </GameProvider>,
+  );
+
+  await userEvent.click(
+    screen.getByRole("button", { name: /harness start power mode/i }),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: /harness try overlap eat/i }),
+  );
+  expect(screen.getByTestId("eaten-count")).toHaveTextContent("1");
+});
+
+test("tryPowerEatFromPacmanMove does not call onEaten when not overlapping", async () => {
+  render(
+    <GameProvider>
+      <PowerEatHarness />
+    </GameProvider>,
+  );
+
+  await userEvent.click(
+    screen.getByRole("button", { name: /harness start power mode/i }),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: /harness try no overlap eat/i }),
+  );
+  expect(screen.getByTestId("eaten-count")).toHaveTextContent("0");
+});
+
+test("restartGame clears power-eat registry so stale ghosts are not eaten", async () => {
+  const listener = jest.fn();
+  document.addEventListener("restart-game", listener);
+
+  render(
+    <GameProvider>
+      <PowerEatHarness />
+      <TestConsumer />
+    </GameProvider>,
+  );
+
+  await userEvent.click(
+    screen.getByRole("button", { name: /harness start power mode/i }),
+  );
+  await userEvent.click(screen.getByRole("button", { name: /restart/i }));
+  expect(listener).toHaveBeenCalled();
+
+  await userEvent.click(
+    screen.getByRole("button", { name: /harness start power mode/i }),
+  );
+  await userEvent.click(
+    screen.getByRole("button", { name: /harness try overlap eat/i }),
+  );
+  expect(screen.getByTestId("eaten-count")).toHaveTextContent("0");
+
+  document.removeEventListener("restart-game", listener);
+});

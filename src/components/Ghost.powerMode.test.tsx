@@ -1,5 +1,6 @@
 import React from "react";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { useInterval } from "../hooks/useInterval";
 import Ghost from "./Ghost";
 import { GameProvider, useGameContext } from "../context/GameContext";
@@ -47,6 +48,27 @@ function PowerOn() {
     startOrRefreshPowerMode();
   }, [startOrRefreshPowerMode]);
   return null;
+}
+
+function StartPowerButton() {
+  const { startOrRefreshPowerMode } = useGameContext();
+  return (
+    <button type="button" onClick={startOrRefreshPowerMode}>
+      start power
+    </button>
+  );
+}
+
+function PacTryEatOnly() {
+  const { tryPowerEatFromPacmanMove } = useGameContext();
+  return (
+    <button
+      type="button"
+      onClick={() => tryPowerEatFromPacmanMove({ left: 0, top: 0 }, 60)}
+    >
+      pac try eat
+    </button>
+  );
 }
 
 beforeEach(() => {
@@ -106,6 +128,47 @@ test("ghost overlap sets LOST when power mode is inactive", async () => {
   expect(screen.getByTestId("game-status")).toHaveTextContent(
     GAME_STATUS.LOST,
   );
+});
+
+test("after restart-game, Pac move-based power eat registers ghost again", async () => {
+  render(
+    <GameProvider>
+      <SeedMiniGrid />
+      <StartPowerButton />
+      <PacTryEatOnly />
+      <Ghost {...ghostProps} />
+      <button
+        type="button"
+        onClick={() => document.dispatchEvent(new Event("restart-game"))}
+      >
+        restart event
+      </button>
+    </GameProvider>,
+  );
+
+  await waitFor(() => {
+    expect(screen.getByTestId("ghost1")).toHaveStyle({
+      top: "0px",
+      left: "0px",
+    });
+  });
+
+  await userEvent.click(screen.getByRole("button", { name: /^start power$/i }));
+  await userEvent.click(screen.getByRole("button", { name: /pac try eat/i }));
+  await waitFor(() => {
+    expect(screen.queryByTestId("ghost1")).not.toBeInTheDocument();
+  });
+
+  await userEvent.click(
+    screen.getByRole("button", { name: /restart event/i }),
+  );
+  expect(screen.getByTestId("ghost1")).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: /^start power$/i }));
+  await userEvent.click(screen.getByRole("button", { name: /pac try eat/i }));
+  await waitFor(() => {
+    expect(screen.queryByTestId("ghost1")).not.toBeInTheDocument();
+  });
 });
 
 test("eaten ghost respawns when power mode expires", async () => {
