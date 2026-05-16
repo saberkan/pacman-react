@@ -30,7 +30,7 @@ test("restartGame resets score, sets in progress, and dispatches event", async (
     </GameProvider>
   );
 
-  expect(screen.getByTestId("status")).toHaveTextContent(GAME_STATUS.PAUSED);
+  expect(screen.getByTestId("status")).toHaveTextContent(GAME_STATUS.READY);
   await userEvent.click(screen.getByRole("button", { name: /add points/i }));
   expect(screen.getByTestId("points")).toHaveTextContent("5");
 
