@@ -1,6 +1,6 @@
 import React from "react";
 import styled, { keyframes } from "styled-components";
-import { Position } from "../types/position";
+import { Position, pacmanStartPosition } from "../types/position";
 import { ARROW, DIRECTION, Direction } from "../types/direction";
 import { Character } from "../types/character";
 import { useGameContext } from "../context/GameContext";
@@ -8,6 +8,11 @@ import { useInterval } from "../hooks/useInterval";
 import { COLOR } from "../types/color";
 import { GAME_STATUS } from "../types/gameStatus";
 import colors from "../styles/Colors";
+import {
+  snapPositionToFoodGrid,
+  stepOnFoodGrid,
+} from "../utils/playfieldGridMovement";
+import { MOVEMENT_TICK_MS } from "../constants/gameplayPacing";
 
 interface StyledPacmanProps {
   direction: Direction;
@@ -24,15 +29,42 @@ const Pacman = (props: Character) => {
     pacmanPosition: position,
     setPacmanPosition,
     gameStatus,
+    playfieldGrid,
   } = useGameContext();
   const gameStatusRef = React.useRef(gameStatus);
   React.useEffect(() => {
     gameStatusRef.current = gameStatus;
   }, [gameStatus]);
 
+  const positionRef = React.useRef(position);
+  positionRef.current = position;
+
   const [direction, setDirection] = React.useState<Direction>(DIRECTION.RIGHT);
+  const directionRef = React.useRef(direction);
+  directionRef.current = direction;
+
+  const playfieldGridRef = React.useRef(playfieldGrid);
+  React.useEffect(() => {
+    playfieldGridRef.current = playfieldGrid;
+  }, [playfieldGrid]);
+
+  React.useLayoutEffect(() => {
+    if (
+      !playfieldGrid ||
+      playfieldGrid.cols <= 0 ||
+      playfieldGrid.rows <= 0
+    ) {
+      return;
+    }
+    const p = positionRef.current;
+    const snapped = snapPositionToFoodGrid(p, playfieldGrid);
+    if (snapped.left !== p.left || snapped.top !== p.top) {
+      setPacmanPosition(snapped);
+    }
+  }, [playfieldGrid, setPacmanPosition]);
+
   const [color, setColor] = React.useState<string>(props.color);
-  useInterval(move, 100);
+  useInterval(move, MOVEMENT_TICK_MS);
 
   React.useEffect(() => {
     function rotate(keypressed: number) {
@@ -70,50 +102,27 @@ const Pacman = (props: Character) => {
 
   function gameRestarted() {
     setColor(props.color);
+    const g = playfieldGridRef.current;
+    if (g && g.cols > 0 && g.rows > 0) {
+      setPacmanPosition(snapPositionToFoodGrid(pacmanStartPosition, g));
+    }
   }
 
   function move() {
     const status = gameStatusRef.current;
     if (status === GAME_STATUS.IN_PROGRESS) {
-      const currentLeft = position.left;
-      const currentTop = position.top;
-      let newPosition: Position = { top: 0, left: 0 };
-      switch (direction) {
-        case DIRECTION.LEFT:
-          newPosition = {
-            top: currentTop,
-            left: Math.max(currentLeft - props.velocity, 0),
-          };
-          break;
-        case DIRECTION.UP:
-          newPosition = {
-            top: Math.max(currentTop - props.velocity, 0),
-            left: currentLeft,
-          };
-          break;
-        case DIRECTION.RIGHT:
-          newPosition = {
-            top: currentTop,
-            left: Math.min(
-              currentLeft + props.velocity,
-              window.innerWidth - props.border - props.size
-            ),
-          };
-          break;
-
-        default:
-          newPosition = {
-            top: Math.min(
-              currentTop + props.velocity,
-              window.innerHeight -
-                props.size -
-                props.border -
-                props.topScoreBoard
-            ),
-            left: currentLeft,
-          };
+      const g = playfieldGridRef.current;
+      if (!g || g.cols <= 0 || g.rows <= 0) {
+        return;
       }
-      setPacmanPosition(newPosition);
+      const next = stepOnFoodGrid(
+        positionRef.current,
+        directionRef.current,
+        g
+      );
+      if (next) {
+        setPacmanPosition(next);
+      }
     }
     if (status === GAME_STATUS.LOST) {
       setColor(COLOR.PACMAN_DEAD);
@@ -174,7 +183,6 @@ const StyledPacman = styled.div<StyledPacmanProps>`
   height: 60px;
   border-radius: 50%;
   background: ${(props) => (props.isAlive ? colors.color2 : "white")};
-  position: relative;
 `;
 
 const PacmanEye = styled.div`
