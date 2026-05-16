@@ -7,6 +7,12 @@
         "matcher": "git\\s+commit\\b",
         "timeout": 30
       }
+    ],
+    "stop": [
+      {
+        "command": ".cursor/hooks/restart-dev-on-agent-stop.sh",
+        "timeout": 120
+      }
     ]
   }
 }

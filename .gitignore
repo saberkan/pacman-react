@@ -21,3 +21,7 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Cursor dev-server hook spillover
+.cursor/dev-server.log
+.cursor/dev-server.pid
