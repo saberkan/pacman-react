@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "command": ".cursor/hooks/pre-commit-tests.sh",
+        "matcher": "git\\s+commit\\b",
+        "timeout": 30
+      }
+    ]
+  }
+}
