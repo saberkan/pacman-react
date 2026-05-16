@@ -1,0 +1,28 @@
+---
+description: After dev or important code changes, run test-coverage subagent and iterate until green
+alwaysApply: true
+---
+
+# Post-change testing workflow
+
+## When this applies
+
+After you make **non-trivial development work** or **important behavioral changes** in this repo — for example: new features, bug fixes, refactors that affect game logic, UI flow, hooks, or utilities under `src/`, or anything that could regress user-visible behavior.
+
+Skip only for trivial edits that cannot affect behavior (typo in comments-only, whitespace, pure docs outside runtime code) unless the user asks for tests anyway.
+
+## Required follow-up
+
+1. **Run the test-coverage specialist**  
+   Use the Task tool with subagent type `test-coverage-specialist` so automated tests are added or updated for the changed behavior and the suite is run (this project: `CI=true yarn test` per `AGENTS.md`).
+
+2. **If tests fail or the subagent reports failures**  
+   Fix the underlying issue (implementation, test, or environment), then **invoke the specialist again** until the run succeeds. Do not stop with a failing test suite for changes in scope.
+
+3. **If the specialist cannot reach green**  
+   Explain the blocker, the smallest next step, and do not pretend the work is complete.
+
+## Principles
+
+- Prefer meaningful coverage of behavior and regressions over inflating metrics.
+- Match existing Jest / React Testing Library patterns in the repo.
