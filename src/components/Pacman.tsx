@@ -1,11 +1,10 @@
 import React from "react";
-import styled, { keyframes } from "styled-components";
+import styled, { css, keyframes } from "styled-components";
 import { Position, pacmanStartPosition } from "../types/position";
 import { ARROW, DIRECTION, Direction } from "../types/direction";
 import { Character } from "../types/character";
 import { useGameContext } from "../context/GameContext";
 import { useInterval } from "../hooks/useInterval";
-import { COLOR } from "../types/color";
 import { GAME_STATUS } from "../types/gameStatus";
 import colors from "../styles/Colors";
 import {
@@ -18,6 +17,7 @@ interface StyledPacmanProps {
   direction: Direction;
   position: Position;
   isAlive: boolean;
+  $powerMode: boolean;
 }
 
 type PacmanMouthProps = {
@@ -30,6 +30,8 @@ const Pacman = (props: Character) => {
     setPacmanPosition,
     gameStatus,
     playfieldGrid,
+    powerModeActive,
+    tryPowerEatFromPacmanMove,
   } = useGameContext();
   const gameStatusRef = React.useRef(gameStatus);
   React.useEffect(() => {
@@ -63,7 +65,6 @@ const Pacman = (props: Character) => {
     }
   }, [playfieldGrid, setPacmanPosition]);
 
-  const [color, setColor] = React.useState<string>(props.color);
   useInterval(move, MOVEMENT_TICK_MS);
 
   React.useEffect(() => {
@@ -101,7 +102,6 @@ const Pacman = (props: Character) => {
   }, []);
 
   function gameRestarted() {
-    setColor(props.color);
     const g = playfieldGridRef.current;
     if (g && g.cols > 0 && g.rows > 0) {
       setPacmanPosition(snapPositionToFoodGrid(pacmanStartPosition, g));
@@ -122,20 +122,18 @@ const Pacman = (props: Character) => {
       );
       if (next) {
         setPacmanPosition(next);
+        tryPowerEatFromPacmanMove(next, props.size);
       }
-    }
-    if (status === GAME_STATUS.LOST) {
-      setColor(COLOR.PACMAN_DEAD);
     }
   }
 
   return (
     <StyledPacman
       tabIndex={0}
-      color={color}
       position={position}
       direction={direction}
       isAlive={gameStatus !== GAME_STATUS.LOST}
+      $powerMode={powerModeActive && gameStatus === GAME_STATUS.IN_PROGRESS}
     >
       <PacmanEye />
       <PacmanMouth moving={gameStatus === GAME_STATUS.IN_PROGRESS} />
@@ -161,6 +159,24 @@ const eat = keyframes`
   }
 `;
 
+/** Pulses between pellet yellow and playfield wall white (Scene border #fff). */
+const wallPowerPulse = keyframes`
+  0%,
+  100% {
+    background: ${colors.color2};
+    box-shadow:
+      inset 0 0 0 1px rgba(0, 0, 0, 0.2),
+      0 0 0 0 rgba(255, 255, 255, 0);
+  }
+  50% {
+    background: #ffffff;
+    box-shadow:
+      inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+      inset 0 0 10px rgba(0, 0, 0, 0.2),
+      0 0 16px rgba(255, 255, 255, 0.95);
+  }
+`;
+
 const StyledPacman = styled.div<StyledPacmanProps>`
   width: 60px;
   height: 63px;
@@ -183,6 +199,13 @@ const StyledPacman = styled.div<StyledPacmanProps>`
   height: 60px;
   border-radius: 50%;
   background: ${(props) => (props.isAlive ? colors.color2 : "white")};
+
+  ${(p) =>
+    p.$powerMode && p.isAlive
+      ? css`
+          animation: ${wallPowerPulse} 0.48s ease-in-out infinite;
+        `
+      : css``}
 `;
 
 const PacmanEye = styled.div`

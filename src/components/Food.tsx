@@ -1,15 +1,30 @@
 import React from "react";
-import styled from "styled-components";
+import styled, { css, keyframes } from "styled-components";
 import { Position } from "../types/position";
 import colors from "../styles/Colors";
 import { useGameContext } from "../context/GameContext";
 import { GAME_STATUS } from "../types/gameStatus";
+
+const foodBlink = keyframes`
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.88);
+  }
+`;
+
+export type FoodVariant = "normal" | "special";
 
 interface StyledFoodProps {
   position: Position;
   hidden: boolean;
   $cellWidth: number;
   $cellHeight: number;
+  $variant: FoodVariant;
 }
 
 const eatPrecision = 18;
@@ -22,11 +37,13 @@ export type FoodProps = {
   /** Matches playfield grid pitch (default 60). */
   cellWidth?: number;
   cellHeight?: number;
+  variant?: FoodVariant;
 };
 
 const Food = (props: FoodProps) => {
   const cellWidth = props.cellWidth ?? 60;
   const cellHeight = props.cellHeight ?? 60;
+  const variant = props.variant ?? "normal";
   const position = props.position;
   const [isHidden, setIsHidden] = React.useState(false);
   const {
@@ -36,6 +53,7 @@ const Food = (props: FoodProps) => {
     foodAmount,
     setGameStatus,
     gameStatus,
+    startOrRefreshPowerMode,
   } = useGameContext();
 
   function eaten() {
@@ -64,12 +82,27 @@ const Food = (props: FoodProps) => {
       pacmanPosition.top - (props.pacmanSize - eatPrecision) / 2 < position.top
     ) {
       eaten();
+      if (variant === "special") {
+        startOrRefreshPowerMode();
+      }
       if (foodAmount === points + 1) {
         setGameStatus(GAME_STATUS.WON);
       }
       setPoints(points + 1);
     }
-  }, [pacmanPosition, position, gameStatus, isHidden]);
+  }, [
+    pacmanPosition,
+    position,
+    gameStatus,
+    isHidden,
+    variant,
+    foodAmount,
+    points,
+    startOrRefreshPowerMode,
+    setGameStatus,
+    setPoints,
+    props.pacmanSize,
+  ]);
 
   return (
     <StyledFood
@@ -77,8 +110,13 @@ const Food = (props: FoodProps) => {
       hidden={isHidden}
       $cellWidth={cellWidth}
       $cellHeight={cellHeight}
+      $variant={variant}
     >
-      <div className="effective-food"></div>
+      <div
+        className="effective-food"
+        data-testid="food-dot"
+        data-food-variant={variant}
+      />
     </StyledFood>
   );
 };
@@ -100,6 +138,19 @@ const StyledFood = styled.div<StyledFoodProps>`
     background-color: ${colors.color2};
     flex-shrink: 0;
   }
+
+  ${(p) =>
+    p.$variant === "special"
+      ? css`
+          .effective-food {
+            animation: ${foodBlink} 0.55s ease-in-out infinite;
+            background-color: #fff8dc;
+            box-shadow: 0 0 8px rgba(255, 235, 80, 0.95);
+            width: 12px;
+            height: 12px;
+          }
+        `
+      : css``}
 `;
 
 export default Food;
