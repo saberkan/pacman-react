@@ -5,4 +5,6 @@ export type Character = {
   topScoreBoard: number;
   color: string;
   name: string;
+  /** Used with centerRespawn after power mode (0 = left-of-center, 1 = right-of-center). */
+  respawnSlot?: number;
 };

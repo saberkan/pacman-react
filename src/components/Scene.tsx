@@ -8,6 +8,7 @@ import { useGameContext } from "../context/GameContext";
 import { GAME_STATUS } from "../types/gameStatus";
 import { COLOR } from "../types/color";
 import { computePlayfieldFoodGrid } from "../utils/computePlayfieldFoodGrid";
+import { assignSpecialFoodCells } from "../utils/assignSpecialFoodCells";
 
 type SceneProps = {
   foodSize: number;
@@ -27,27 +28,29 @@ const windowFallbackInnerSize = (p: SceneProps) => ({
 });
 
 const generateFoodMatrix = (
-  props: SceneProps,
   cols: number,
   rows: number,
   cellWidth: number,
-  cellHeight: number
+  cellHeight: number,
+  specialCells: Set<string>,
 ) => {
   const foods = [];
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
+      const key = `${row}-${col}`;
       foods.push(
         <Food
           pacmanSize={pacmanSize}
           hidden={false}
-          name={`food-${row}-${col}`}
+          name={`food-${key}`}
           cellWidth={cellWidth}
           cellHeight={cellHeight}
           position={{
             left: col * cellWidth,
             top: row * cellHeight,
           }}
-          key={`${row}-${col}`}
+          variant={specialCells.has(key) ? "special" : "normal"}
+          key={key}
         />
       );
     }
@@ -74,6 +77,13 @@ const Scene = (props: SceneProps) => {
     cellWidth: number;
     cellHeight: number;
   } | null>(null);
+  const [specialFoodCells, setSpecialFoodCells] = React.useState<
+    Set<string>
+  >(() => new Set());
+  const foodGridRef = React.useRef(foodGrid);
+  React.useEffect(() => {
+    foodGridRef.current = foodGrid;
+  }, [foodGrid]);
 
   const gameStatusRef = React.useRef(gameStatus);
   React.useEffect(() => {
@@ -118,6 +128,18 @@ const Scene = (props: SceneProps) => {
     };
   }, [gameStatus, setGameStatus]);
 
+  React.useEffect(() => {
+    const onRestart = () => {
+      const g = foodGridRef.current;
+      if (!g) {
+        return;
+      }
+      setSpecialFoodCells(assignSpecialFoodCells(g.cols, g.rows));
+    };
+    document.addEventListener("restart-game", onRestart);
+    return () => document.removeEventListener("restart-game", onRestart);
+  }, []);
+
   React.useLayoutEffect(() => {
     const node = sceneRef.current;
     if (!node) {
@@ -159,6 +181,7 @@ const Scene = (props: SceneProps) => {
         cellWidth: computed.cellWidth,
         cellHeight: computed.cellHeight,
       });
+      setSpecialFoodCells(assignSpecialFoodCells(cols, rows));
       setFoodAmount(cols * rows);
       setPlayfieldInnerSize({ width: innerWidthPx, height: innerHeightPx });
       setPlayfieldGrid({
@@ -229,11 +252,11 @@ const Scene = (props: SceneProps) => {
         )}
       {foodGrid
         ? generateFoodMatrix(
-            props,
             foodGrid.cols,
             foodGrid.rows,
             foodGrid.cellWidth,
-            foodGrid.cellHeight
+            foodGrid.cellHeight,
+            specialFoodCells,
           )
         : null}
       <Pacman
@@ -251,6 +274,7 @@ const Scene = (props: SceneProps) => {
         topScoreBoard={topScoreBoardHeight}
         color={COLOR.RED}
         name="ghost1"
+        respawnSlot={0}
       ></Ghost>
       <Ghost
         velocity={easyGhostVelocity}
@@ -259,6 +283,7 @@ const Scene = (props: SceneProps) => {
         topScoreBoard={topScoreBoardHeight}
         color={COLOR.GREEN}
         name="ghost2"
+        respawnSlot={1}
       ></Ghost>
     </StyledScene>
   );

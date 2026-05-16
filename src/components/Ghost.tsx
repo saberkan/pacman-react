@@ -13,6 +13,8 @@ import {
 } from "../utils/playfieldGridMovement";
 import { clampCharacterToPlayfield } from "../utils/clampCharacterToPlayfield";
 import { MOVEMENT_TICK_MS } from "../constants/gameplayPacing";
+import { centerRespawnPosition } from "../utils/ghostRespawn";
+import { pacGhostHitBoxOverlap } from "../utils/characterOverlap";
 
 interface StyledGhostProps {
   position: Position;
@@ -51,6 +53,8 @@ const Ghost = (props: Character) => {
     gameStatus,
     playfieldGrid,
     playfieldInnerSize,
+    powerModeActive,
+    registerPowerEatGhost,
   } = useGameContext();
   const gameStatusRef = React.useRef(gameStatus);
   React.useEffect(() => {
@@ -70,14 +74,65 @@ const Ghost = (props: Character) => {
     playfieldGridRef.current = playfieldGrid;
   }, [playfieldGrid]);
 
+  const powerModeActiveRef = React.useRef(powerModeActive);
+  powerModeActiveRef.current = powerModeActive;
+
   const [position, setPosition] = React.useState<Position>(ghostStartPosition);
+  const positionRef = React.useRef(position);
+  positionRef.current = position;
   const [direction, setDirection] = React.useState<Direction>(DIRECTION.LEFT);
   const directionRef = React.useRef(direction);
   directionRef.current = direction;
   const [color, setColor] = React.useState<string>(props.color!);
+  const [isEaten, setIsEaten] = React.useState(false);
+  const isEatenRef = React.useRef(isEaten);
+  React.useEffect(() => {
+    isEatenRef.current = isEaten;
+  }, [isEaten]);
+
+  const prevPowerRef = React.useRef(powerModeActive);
   const [changeDirectionWaitingTime, setChangeDirectionWaitingTime] =
     React.useState(0);
   useInterval(move, MOVEMENT_TICK_MS);
+
+  React.useEffect(() => {
+    const prev = prevPowerRef.current;
+    prevPowerRef.current = powerModeActive;
+    if (
+      prev &&
+      !powerModeActive &&
+      gameStatus === GAME_STATUS.IN_PROGRESS &&
+      isEaten
+    ) {
+      const g = playfieldGridRef.current;
+      if (g && g.cols > 0 && g.rows > 0) {
+        setPosition(centerRespawnPosition(g, props.respawnSlot ?? 0));
+      }
+      setIsEaten(false);
+      setDirection(DIRECTION.LEFT);
+      setChangeDirectionWaitingTime(0);
+      setColor(props.color!);
+    }
+  }, [
+    powerModeActive,
+    gameStatus,
+    isEaten,
+    props.color,
+    props.respawnSlot,
+  ]);
+
+  React.useLayoutEffect(() => {
+    if (isEaten) {
+      return;
+    }
+    return registerPowerEatGhost(props.name, {
+      getPosition: () => positionRef.current,
+      size: props.size,
+      onEaten: () => {
+        queueMicrotask(() => setIsEaten(true));
+      },
+    });
+  }, [isEaten, props.name, props.size, registerPowerEatGhost]);
 
   React.useEffect(() => {
     document.addEventListener("restart-game", gameRestarted);
@@ -85,6 +140,7 @@ const Ghost = (props: Character) => {
   }, []);
 
   function gameRestarted() {
+    setIsEaten(false);
     setColor(props.color);
     const g = playfieldGridRef.current;
     if (g && g.cols > 0 && g.rows > 0) {
@@ -120,6 +176,9 @@ const Ghost = (props: Character) => {
   function move() {
     const status = gameStatusRef.current;
     if (status === GAME_STATUS.IN_PROGRESS) {
+      if (isEatenRef.current) {
+        return;
+      }
       if (changeDirectionWaitingTime > 4) {
         const movement = Math.floor(Math.random() * 4) + 0;
         const arrayOfMovement: Direction[] = [
@@ -146,13 +205,20 @@ const Ghost = (props: Character) => {
         const newPosition = stepped ?? oldPosition;
 
         const pp = pacmanPositionRef.current;
+        const overlapPacman = pacGhostHitBoxOverlap(pp, newPosition, props.size);
+
         if (
-          pp.left > newPosition.left - props.size &&
-          pp.left < newPosition.left + props.size &&
-          pp.top > newPosition.top - props.size &&
-          pp.top < newPosition.top + props.size
+          powerModeActiveRef.current &&
+          overlapPacman &&
+          !isEatenRef.current
         ) {
-          setGameStatus(GAME_STATUS.LOST);
+          queueMicrotask(() => {
+            setIsEaten(true);
+          });
+        } else if (!powerModeActiveRef.current && overlapPacman) {
+          queueMicrotask(() => {
+            setGameStatus(GAME_STATUS.LOST);
+          });
         }
 
         return newPosition;
@@ -166,8 +232,21 @@ const Ghost = (props: Character) => {
     }
   }
 
+  const displayColor =
+    gameStatus === GAME_STATUS.IN_PROGRESS && !powerModeActive
+      ? color
+      : COLOR.GHOST_DEAD;
+
+  if (isEaten) {
+    return null;
+  }
+
   return (
-    <StyledGhost color={color} position={position}>
+    <StyledGhost
+      data-testid={props.name}
+      color={displayColor}
+      position={position}
+    >
       <GhostIcon />
     </StyledGhost>
   );
